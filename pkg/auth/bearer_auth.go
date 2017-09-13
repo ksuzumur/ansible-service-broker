@@ -27,6 +27,7 @@ func (b BearerAuth) GetPrincipal(r *http.Request) (Principal, error) {
 	if strings.HasPrefix(authheader, prefix) {
 		token := authheader[len(prefix):]
 	}
+
 	/*
 		if username, password, ok := r.BearerAuth(); ok {
 			if !b.usa.ValidateUser(username, password) {

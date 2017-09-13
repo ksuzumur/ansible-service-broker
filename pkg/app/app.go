@@ -124,6 +124,9 @@ func CreateApp() App {
 		os.Exit(1)
 	}
 
+	authcli := k8scli.AuthenticationV1().RESTClient()
+	authcli.TokenReviews()
+
 	app.log.Debug("Connecting Registry")
 	for _, r := range app.config.Registry {
 		reg, err := registries.NewRegistry(r, app.log.Logger)
