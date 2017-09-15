@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -26,6 +27,7 @@ func (b BearerAuth) GetPrincipal(r *http.Request) (Principal, error) {
 	authheader := r.Header.Get("Authorization")
 	if strings.HasPrefix(authheader, prefix) {
 		token := authheader[len(prefix):]
+		fmt.Println(token)
 	}
 
 	/*
