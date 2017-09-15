@@ -29,7 +29,9 @@ import (
 	"time"
 
 	kapierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeversiontypes "k8s.io/apimachinery/pkg/version"
+	"k8s.io/kubernetes/pkg/apis/authentication/v1"
 
 	logging "github.com/op/go-logging"
 	"github.com/openshift/ansible-service-broker/pkg/apb"
@@ -124,8 +126,126 @@ func CreateApp() App {
 		os.Exit(1)
 	}
 
-	authcli := k8scli.AuthenticationV1().RESTClient()
-	authcli.TokenReviews()
+	/*
+	   // TokenReview attempts to authenticate a token to a known user.
+	   // Note: TokenReview requests may be cached by the webhook token authenticator
+	   // plugin in the kube-apiserver.
+	   type TokenReview struct {
+		metav1.TypeMeta `json:",inline"`
+		// +optional
+		metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+		// Spec holds information about the request being evaluated
+		Spec TokenReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
+
+		// Status is filled in by the server and indicates whether the request can be authenticated.
+		// +optional
+		Status TokenReviewStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+	   }
+
+	   // TokenReviewSpec is a description of the token authentication request.
+	   type TokenReviewSpec struct {
+		// Token is the opaque bearer token.
+		// +optional
+		Token string `json:"token,omitempty" protobuf:"bytes,1,opt,name=token"`
+	   }
+
+	   // TokenReviewStatus is the result of the token authentication request.
+	   type TokenReviewStatus struct {
+		// Authenticated indicates that the token was associated with a known user.
+		// +optional
+		Authenticated bool `json:"authenticated,omitempty" protobuf:"varint,1,opt,name=authenticated"`
+		// User is the UserInfo associated with the provided token.
+		// +optional
+		User UserInfo `json:"user,omitempty" protobuf:"bytes,2,opt,name=user"`
+		// Error indicates that the token couldn't be checked
+		// +optional
+		Error string `json:"error,omitempty" protobuf:"bytes,3,opt,name=error"`
+	   }
+	*/
+	app.log.Notice("================== BEGIN TOKEN ===============")
+
+	app.log.Debug("Creating an auth client")
+	authcli := k8scli.AuthenticationV1()
+	app.log.Debug("calling token review")
+	// so the nil needs to be a TokenReview struct. And the Spec needs to be the
+	// Token.
+
+	tr := &v1.TokenReview{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "asb-token-review",
+		},
+		Spec: v1.TokenReviewSpec{
+			Token: "ZGVhZGJlZWY=", // deadbeef
+		},
+	}
+
+	tokenreview, err := authcli.TokenReviews().Create(tr)
+	// the tokenreview returned will have a  TokenReviewStatus which contains
+	// the userinfo which we need.
+	if err != nil {
+		app.log.Errorf("Error calling token review. %#v", err)
+		os.Exit(1)
+	}
+
+	if tokenreview.Status.Authenticated {
+		app.log.Debug("We have an authenticated token")
+		app.log.Debugf("userinfo: %v", tokenreview.Status.User)
+	} else {
+		app.log.Debug("We have an UNauthenticated token")
+		app.log.Debugf("Error: %v", tokenreview.Status.Error)
+	}
+	app.log.Notice("================== END TOKEN ===============")
+
+	app.log.Notice("================== BEGIN SAR ===============")
+	app.log.Debug("Creating an authz client")
+	authzcli := k8scli.AuthorizationV1()
+	app.log.Debug("calling subject access review")
+
+	/*
+			type SubjectAccessReviewSpec struct {
+		    // ResourceAuthorizationAttributes describes information for a resource access request
+		    // +optional
+		    ResourceAttributes *ResourceAttributes `json:"resourceAttributes,omitempty" protobuf:"bytes,1,opt,name=resourceAttributes"`
+		    // NonResourceAttributes describes information for a non-resource access request
+		    // +optional
+		    NonResourceAttributes *NonResourceAttributes `json:"nonResourceAttributes,omitempty" protobuf:"bytes,2,opt,name=nonResourceAttributes"`
+
+		    // User is the user you're testing for.
+		    // If you specify "User" but not "Groups", then is it interpreted as "What if User were not a member of any groups
+		    // +optional
+		    User string `json:"user,omitempty" protobuf:"bytes,3,opt,name=user"`
+		    // Groups is the groups you're testing for.
+		    // +optional
+		    Groups []string `json:"groups,omitempty" protobuf:"bytes,4,rep,name=groups"`
+		    // Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer
+		    // it needs a reflection here.
+		    // +optional
+		    Extra map[string]ExtraValue `json:"extra,omitempty" protobuf:"bytes,5,rep,name=extra"`
+		    // UID information about the requesting user.
+		    // +optional
+		    UID string `json:"uid,omitempty" protobuf:"bytes,6,opt,name=uid"`
+		}
+	*/
+	sar := &v1.SubjectAccessReview{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "asb-sar-review",
+		},
+		Spec: v1.SubjectAccessReviewSpec{}, // need to fill this out
+	}
+	dasar, sarerr := authzcli.SubjectAccessReviews().Create(sar)
+	if sarerr != nil {
+		app.log.Errorf("Error calling subject access review. %#v", sarerr)
+		os.Exit(1)
+	}
+
+	if dasar.Status.Allowed {
+		app.log.Debug("We have access")
+	} else {
+		app.log.Debug("We DO NOT have access")
+		app.log.Debugf("Reason: %v, Error: %v", dasar.Status.Reason, dasar.Status.Error)
+	}
+	app.log.Notice("================== END SAR ===============")
 
 	app.log.Debug("Connecting Registry")
 	for _, r := range app.config.Registry {
