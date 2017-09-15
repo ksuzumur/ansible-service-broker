@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeversiontypes "k8s.io/apimachinery/pkg/version"
 	"k8s.io/kubernetes/pkg/apis/authentication/v1"
+	authzv1 "k8s.io/kubernetes/pkg/apis/authorization/v1"
 
 	logging "github.com/op/go-logging"
 	"github.com/openshift/ansible-service-broker/pkg/apb"
@@ -227,11 +228,11 @@ func CreateApp() App {
 		    UID string `json:"uid,omitempty" protobuf:"bytes,6,opt,name=uid"`
 		}
 	*/
-	sar := &v1.SubjectAccessReview{
+	sar := &authzv1.SubjectAccessReview{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "asb-sar-review",
 		},
-		Spec: v1.SubjectAccessReviewSpec{}, // need to fill this out
+		Spec: authzv1.SubjectAccessReviewSpec{}, // need to fill this out
 	}
 	dasar, sarerr := authzcli.SubjectAccessReviews().Create(sar)
 	if sarerr != nil {
@@ -243,7 +244,7 @@ func CreateApp() App {
 		app.log.Debug("We have access")
 	} else {
 		app.log.Debug("We DO NOT have access")
-		app.log.Debugf("Reason: %v, Error: %v", dasar.Status.Reason, dasar.Status.Error)
+		app.log.Debugf("Reason: %v, Error: %v", dasar.Status.Reason, dasar.Status.EvaluationError)
 	}
 	app.log.Notice("================== END SAR ===============")
 
