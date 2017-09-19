@@ -214,12 +214,12 @@ parameters:
 - description: Service Broker kind. Newer service-catalogs use ServiceBroker
   displayname: Service Broker kind. Newer service-catalogs use ServiceBroker
   name: BROKER_KIND
-  value: ServiceBroker
+  value: Broker
 
 - description: Broker Auth Info
   displayname: Broker Auth Info
   name: BROKER_AUTH
-  value: '{ "basic": { "secretRef": { "namespace": "ansible-service-broker", "name": "asb-auth-secret" } } }'
+  value: '{ "basicAuthSecret": { "namespace": "ansible-service-broker", "name": "asb-auth-secret" }}'
 - description: Scheme for ansible service broker (http/https)
   displayname: Scheme for ansible service broker (http/https)
   name: ASB_SCHEME
